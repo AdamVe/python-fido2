@@ -495,20 +495,26 @@ class _Ctap2ClientBackend(_ClientBackend):
             self.info.options.get(k) for k in ("uv", "clientPin", "bioEnroll")
         )
 
+        always_uv = self.info.options.get("alwaysUv")
+        make_cred_uv_not_rqd = self.info.options.get("makeCredUvNotRqd")
+
+        if always_uv is False and make_cred_uv_not_rqd is True:
+            make_cred_uv_not_rqd = False
+
         if (
             user_verification == UserVerificationRequirement.REQUIRED
             or (
                 user_verification == UserVerificationRequirement.PREFERRED
                 and uv_supported
             )
-            or self.info.options.get("alwaysUv")
+            or always_uv
         ):
             if not uv_configured:
                 raise ClientError.ERR.CONFIGURATION_UNSUPPORTED(
                     "User verification not configured/supported"
                 )
             return True
-        elif mc and uv_configured and not self.info.options.get("makeCredUvNotRqd"):
+        elif mc and uv_configured and not make_cred_uv_not_rqd:
             return True
         return False
 
@@ -548,7 +554,9 @@ class _Ctap2ClientBackend(_ClientBackend):
         pin_token = None
         pin_auth = None
         internal_uv = False
-        if self._should_use_uv(user_verification, mc) or permissions:
+        should = self._should_use_uv(user_verification, mc)
+
+        if should or permissions:
             client_pin = ClientPin(self.ctap2)
             allow_internal_uv = not permissions
             permissions |= (
